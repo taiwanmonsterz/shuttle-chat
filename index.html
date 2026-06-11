@@ -85,6 +85,8 @@
   header .h-title{font-size:14px; font-weight:700; line-height:1.2}
   header .h-sub{font-size:11px; color:#8a8170; margin-top:2px}
   header .h-meta{margin-left:auto; text-align:right}
+  #leaveBtn{width:28px; height:28px; border-radius:50%; background:var(--paper-2); color:#8a8170; font-size:14px; display:flex; align-items:center; justify-content:center; flex:0 0 auto}
+  #leaveBtn:active{background:var(--line)}
   .pill{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:4px 9px; border-radius:20px; background:var(--paper-2); color:var(--ink)}
   .dot{width:7px; height:7px; border-radius:50%; background:#bbb}
   .dot.live{background:var(--ok); box-shadow:0 0 0 3px rgba(60,110,71,.18)}
@@ -248,7 +250,10 @@
     <div class="h-sub" id="myInfo">—</div>
   </div>
   <div class="h-meta">
-    <span class="pill"><span class="dot" id="liveDot"></span><span id="onlineN">0</span></span>
+    <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end">
+      <span class="pill"><span class="dot" id="liveDot"></span><span id="onlineN">0</span></span>
+      <button id="leaveBtn" title="나가기" aria-label="나가기">⏻</button>
+    </div>
     <div class="admin-badge" id="adminTag" style="display:none">ADMIN</div>
   </div>
 </header>
@@ -408,7 +413,31 @@ document.getElementById('enterBtn').onclick = async ()=>{
   me.role= isAdminLogin ? "admin" : "guest";
   me.id="u_"+Math.random().toString(36).slice(2,10);
   me.joinedAt=Date.now();
+  saveSession();         // 새로고침 대비 저장
+  await doEnter();
+};
 
+// 세션 저장/복원 (localStorage, 차단 환경에서도 안전)
+const SKEY="twm_shuttle_session";
+function saveSession(){
+  try{
+    localStorage.setItem(SKEY, JSON.stringify({
+      id:me.id, name:me.name, lang:me.lang, role:me.role, tour:me.tour, joinedAt:me.joinedAt
+    }));
+  }catch(e){}
+}
+function clearSession(){ try{ localStorage.removeItem(SKEY); }catch(e){} }
+function loadSession(){
+  try{
+    const raw=localStorage.getItem(SKEY);
+    if(!raw) return null;
+    const s=JSON.parse(raw);
+    if(s && s.id && s.tour && s.lang && s.name) return s;
+  }catch(e){}
+  return null;
+}
+
+async function doEnter(){
   const base="tours/"+me.tour;
   const pRef=ref(db, base+"/presence/"+me.id);
   await set(pRef, { name:me.name, lang:me.lang, role:me.role, ts:Date.now() });
@@ -427,9 +456,27 @@ document.getElementById('enterBtn').onclick = async ()=>{
   document.getElementById('liveDot').classList.add('live');
 
   startMessages(); startPresence(); startNotice(); startLibrary(); startQuick(); showA2HS();
-};
+}
 
-function doBanned(){ try{ remove(ref(db,"tours/"+me.tour+"/presence/"+me.id)); }catch(e){} document.getElementById('banned').classList.add('show'); }
+// 페이지 로드 시 저장된 세션이 있으면 자동 재입장
+(async function tryAutoEnter(){
+  if(!cfgOK) return;
+  const s=loadSession();
+  if(!s) return;
+  if(!TOURS[s.tour]) { clearSession(); return; }
+  me.id=s.id; me.name=s.name; me.lang=s.lang; me.role=s.role; me.tour=s.tour;
+  me.joinedAt=s.joinedAt || Date.now();   // 최초 입장 시각 유지
+  await doEnter();
+})();
+
+function doBanned(){ try{ remove(ref(db,"tours/"+me.tour+"/presence/"+me.id)); }catch(e){} clearSession(); document.getElementById('banned').classList.add('show'); }
+
+document.getElementById('leaveBtn').onclick=()=>{
+  if(!confirm("채팅에서 나가시겠어요?\n다시 들어오려면 이름과 투어를 입력해야 합니다.")) return;
+  try{ remove(ref(db,"tours/"+me.tour+"/presence/"+me.id)); }catch(e){}
+  clearSession();
+  location.reload();
+};
 function B(p){ return "tours/"+me.tour+"/"+p; }
 
 document.getElementById('tabChat').onclick=()=>switchTab('chat');
