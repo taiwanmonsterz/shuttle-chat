@@ -131,6 +131,9 @@
   .act-btn.del:active{background:var(--paper-2)}
   .act-btn.kick{color:var(--danger); border:1px solid var(--danger)}
   .translating{font-size:11px; opacity:.5; font-style:italic}
+  .msg-link{color:inherit; text-decoration:underline; text-underline-offset:2px; word-break:break-all}
+  .them .msg-link{color:var(--brick)}
+  .me .msg-link{color:#fff; text-decoration-color:rgba(255,255,255,.7)}
 
   #library{flex:1 1 auto; overflow-y:auto; padding:16px 14px; display:none; flex-direction:column; gap:11px}
   #library.show{display:flex}
@@ -171,6 +174,9 @@
   .sheet-row button{flex:1; padding:13px; border-radius:11px; font-size:14px; font-weight:700}
   .b-send{background:var(--ink); color:var(--paper)}
   .b-clear{background:var(--paper-2); color:var(--ink)}
+  .b-reset{background:#fff; color:var(--danger); border:1.5px solid var(--danger)}
+  .b-reset:active{background:#fbeeea}
+  .sheet .hint b{font-weight:800; color:var(--brick)}
   .divider{height:1px; background:var(--line); margin:18px 0}
   .roster .ri{display:flex; align-items:center; gap:9px; padding:9px 4px; border-bottom:1px solid var(--line)}
   .roster .nm{font-weight:600; font-size:14px}
@@ -311,6 +317,14 @@
 
     <div class="divider"></div>
 
+    <label>채팅 초기화 (투어 종료 시)</label>
+    <div class="hint" style="margin-bottom:8px">이 투어의 <b>모든 메시지</b>를 한 번에 삭제합니다. 다음 투어를 위해 비울 때 사용하세요. (자료실·자주 쓰는 안내문은 유지됩니다.)</div>
+    <div class="sheet-row">
+      <button class="b-reset" id="chatReset">채팅 전체 삭제</button>
+    </div>
+
+    <div class="divider"></div>
+
     <label>참가자 (<span id="rosterN">0</span>명)</label>
     <div class="roster" id="roster"></div>
   </div>
@@ -353,7 +367,7 @@ if(!cfgOK) document.getElementById('cfgWarn').classList.add('show');
 let app, db;
 if(cfgOK){ app=initializeApp(firebaseConfig); db=getDatabase(app); }
 
-let me = { id:null, name:null, lang:null, role:"guest", tour:null };
+let me = { id:null, name:null, lang:null, role:"guest", tour:null, joinedAt:0 };
 let trCache = {};
 let pickedTour=null, pickedLang=null, isAdminLogin=false;
 
@@ -393,6 +407,7 @@ document.getElementById('enterBtn').onclick = async ()=>{
   me.name=name; me.lang=pickedLang; me.tour=pickedTour;
   me.role= isAdminLogin ? "admin" : "guest";
   me.id="u_"+Math.random().toString(36).slice(2,10);
+  me.joinedAt=Date.now();
 
   const base="tours/"+me.tour;
   const pRef=ref(db, base+"/presence/"+me.id);
@@ -432,8 +447,14 @@ function switchTab(t){
 
 const msgsEl=document.getElementById('msgs');
 function startMessages(){
-  const q=query(ref(db,B("messages")), limitToLast(60));
-  onChildAdded(q, snap=>{ const m=snap.val(); if(m.type==='sys'){ sysLine(m.text,snap.key); return; } renderMsg(m,snap.key); });
+  const q=query(ref(db,B("messages")), limitToLast(80));
+  onChildAdded(q, snap=>{
+    const m=snap.val();
+    // 입장 전 메시지 차단 (관리자·본인 메시지는 예외)
+    if(me.role!=='admin' && m.uid!==me.id && m.ts && m.ts < me.joinedAt) return;
+    if(m.type==='sys'){ sysLine(m.text,snap.key); return; }
+    renderMsg(m,snap.key);
+  });
   onChildRemoved(ref(db,B("messages")), snap=>{ const el=document.getElementById('msg_'+snap.key); if(el) el.remove(); });
 }
 async function renderMsg(m,key){
@@ -443,15 +464,15 @@ async function renderMsg(m,key){
   const bubble=document.createElement('div'); bubble.className="bubble";
   if(m.img){
     const img=document.createElement('img'); img.src=m.img; img.onclick=()=>openLightbox(m.img); bubble.appendChild(img);
-    if(m.text){ const t=document.createElement('div'); t.textContent=m.text; bubble.appendChild(t); }
+    if(m.text){ const t=document.createElement('div'); setTextWithLinks(t, m.text); bubble.appendChild(t); }
   } else if(mine || m.lang===me.lang){
-    bubble.textContent=m.text;
+    setTextWithLinks(bubble, m.text);
   } else {
     const s=document.createElement('div'); s.className="translating"; s.textContent="번역 중…"; bubble.appendChild(s);
     const tr=await translate(m.text,m.lang,me.lang);
     bubble.innerHTML="";
-    const main=document.createElement('div'); main.textContent=tr||m.text; bubble.appendChild(main);
-    if(tr && tr.trim()!==m.text.trim()){ const o=document.createElement('div'); o.className="orig"; o.textContent="원문: "+m.text; bubble.appendChild(o); }
+    const main=document.createElement('div'); setTextWithLinks(main, tr||m.text); bubble.appendChild(main);
+    if(tr && tr.trim()!==m.text.trim()){ const o=document.createElement('div'); o.className="orig"; setTextWithLinks(o, "원문: "+m.text); bubble.appendChild(o); }
   }
   row.appendChild(bubble);
   const tm=document.createElement('div'); tm.className="time"; tm.textContent=fmt(m.ts); row.appendChild(tm);
@@ -468,6 +489,23 @@ async function renderMsg(m,key){
 }
 function sysLine(t,key){ const d=document.createElement('div'); d.className="sys"; if(key) d.id="msg_"+key; d.textContent=t; msgsEl.appendChild(d); msgsEl.scrollTop=msgsEl.scrollHeight; }
 function fmt(ts){ const d=new Date(ts||Date.now()); return d.getHours().toString().padStart(2,'0')+":"+d.getMinutes().toString().padStart(2,'0'); }
+
+// 텍스트 내 URL을 클릭 가능한 링크로 변환 (안전: 텍스트는 textContent, 링크만 a태그)
+function setTextWithLinks(el, text){
+  el.textContent='';
+  if(!text){ return; }
+  const re=/(https?:\/\/[^\s]+)/g;
+  let last=0, mch;
+  while((mch=re.exec(text))!==null){
+    if(mch.index>last) el.appendChild(document.createTextNode(text.slice(last,mch.index)));
+    const a=document.createElement('a');
+    a.href=mch[0]; a.target="_blank"; a.rel="noopener noreferrer";
+    a.textContent=mch[0]; a.className="msg-link";
+    el.appendChild(a);
+    last=mch.index+mch[0].length;
+  }
+  if(last<text.length) el.appendChild(document.createTextNode(text.slice(last)));
+}
 
 const textEl=document.getElementById('text');
 textEl.addEventListener('input',()=>{ textEl.style.height='auto'; textEl.style.height=Math.min(textEl.scrollHeight,120)+'px'; });
@@ -531,6 +569,13 @@ async function trNotice(v){
 }
 document.getElementById('noticeSend').onclick=()=>{ const t=document.getElementById('noticeInput').value.trim(); if(!t) return; set(ref(db,B("notice")),{text:t,lang:me.lang,by:me.name,ts:Date.now()}); document.getElementById('noticeInput').value=''; closeAdmin(); };
 document.getElementById('noticeClear').onclick=()=>remove(ref(db,B("notice")));
+
+document.getElementById('chatReset').onclick=()=>{
+  if(!confirm("이 투어의 모든 채팅 메시지를 삭제할까요?\n(되돌릴 수 없습니다)")) return;
+  if(!confirm("정말 삭제하시겠습니까?\n다음 투어를 위해 채팅을 완전히 비웁니다.")) return;
+  remove(ref(db,B("messages")));
+  closeAdmin();
+};
 
 function startLibrary(){
   onChildAdded(ref(db,B("docs")), snap=>renderDoc(snap.val(),snap.key));
