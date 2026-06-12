@@ -146,14 +146,7 @@
   .them .msg-link{color:var(--brick)}
   .me .msg-link{color:#fff; text-decoration-color:rgba(255,255,255,.7)}
 
-  #library{flex:1 1 auto; overflow-y:auto; padding:16px 14px; display:none; flex-direction:column; gap:11px}
-  #library.show{display:flex}
-  .lib-empty{text-align:center; color:#9a917f; font-size:13px; margin-top:40px; line-height:1.7}
-  .doc-card{display:flex; align-items:center; gap:13px; padding:15px; background:#fffdf8; border:1px solid var(--line); border-radius:13px; text-decoration:none; color:var(--ink)}
-  .doc-ic{width:42px; height:42px; border-radius:10px; background:var(--brick); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; flex:0 0 auto}
-  .doc-tt{font-size:14px; font-weight:700}
-  .doc-sb{font-size:11px; color:#9a917f; margin-top:2px}
-  .doc-del{margin-left:auto; font-size:11px; color:var(--danger); background:none; border:1px solid var(--danger); border-radius:12px; padding:5px 10px; font-weight:600}
+  #library{display:none}
 
   #composer{flex:0 0 auto; background:var(--paper); border-top:1px solid var(--line); padding:9px 10px; padding-bottom:calc(9px + env(safe-area-inset-bottom)); display:flex; align-items:flex-end; gap:7px}
   #quickBar{flex:0 0 auto; display:none; gap:7px; padding:8px 10px 0; overflow-x:auto; -webkit-overflow-scrolling:touch; background:var(--paper)}
@@ -268,11 +261,6 @@
   </div>
 </header>
 
-<div id="tabs">
-  <button id="tabChat" class="on">채팅 Chat</button>
-  <button id="tabLib">자료실 Files</button>
-</div>
-
 <div id="a2hsBanner">
   <button id="a2hsClose" aria-label="닫기">✕</button>
   <div class="a2hs-ic">🔔</div>
@@ -282,10 +270,6 @@
 <div id="noticeBar"><div class="nt">공지 · Notice</div><div class="nb" id="noticeText"></div></div>
 
 <div id="msgs"></div>
-
-<div id="library">
-  <div class="lib-empty" id="libEmpty">아직 등록된 자료가 없습니다.<br>No files yet · 資料はまだありません</div>
-</div>
 
 <div id="quickBar"></div>
 
@@ -301,7 +285,7 @@
   <div class="sheet">
     <button class="close-x" id="adminClose">✕</button>
     <h3>관리자 모드 <span id="admTour" style="font-size:13px;color:var(--brick)"></span></h3>
-    <div class="sub" id="adminSubLabel">공지 · 자료 등록 · 참가자 · 내보내기</div>
+    <div class="sub" id="adminSubLabel">공지 · 예약 · 참가자 · 내보내기</div>
 
     <div id="subOnlyNote" style="display:none; font-size:12.5px; color:#8a8170; background:var(--paper-2); border-radius:10px; padding:11px 13px; line-height:1.6; margin-bottom:6px">
       서브 관리자는 <b>접속자 확인 · 채팅 · 메시지 삭제</b>가 가능합니다.<br>공지·자료·예약 발송은 메인 관리자 전용입니다.
@@ -328,16 +312,6 @@
 
     <div class="divider"></div>
 
-    <label>자료 등록 (PDF 링크)</label>
-    <input id="docTitle" placeholder="자료 제목 (예: 투어 일정표)" style="margin-bottom:8px">
-    <input id="docUrl" placeholder="https://...github.io/.../일정.pdf">
-    <div class="hint" style="margin-top:6px">GitHub에 올린 PDF의 주소를 붙여넣으세요.</div>
-    <div class="sheet-row">
-      <button class="b-send" id="docAdd">자료 추가</button>
-    </div>
-
-    <div class="divider"></div>
-
     <label>자주 쓰는 안내문 (빠른 전송)</label>
     <div class="hint" style="margin-bottom:8px">미리 저장하면 채팅창 위에 버튼으로 떠서, 한 번에 보낼 수 있습니다.</div>
     <textarea id="quickInput" placeholder="예: 10분 뒤 출발합니다. 화장실 다녀오세요."></textarea>
@@ -349,7 +323,7 @@
     <div class="divider"></div>
 
     <label>채팅 초기화 (투어 종료 시)</label>
-    <div class="hint" style="margin-bottom:8px">이 투어의 <b>모든 메시지</b>를 한 번에 삭제합니다. 다음 투어를 위해 비울 때 사용하세요. (자료실·자주 쓰는 안내문은 유지됩니다.)</div>
+    <div class="hint" style="margin-bottom:8px">이 투어의 <b>모든 메시지</b>를 한 번에 삭제합니다. 다음 투어를 위해 비울 때 사용하세요. (자주 쓰는 안내문은 유지됩니다.)</div>
     <div class="sheet-row">
       <button class="b-reset" id="chatReset">채팅 전체 삭제</button>
     </div>
@@ -628,7 +602,7 @@ async function doEnter(){
   }
   document.getElementById('liveDot').classList.add('live');
 
-  startMessages(); startPresence(); startNotice(); startLibrary(); startQuick(); showA2HS();
+  startMessages(); startPresence(); startNotice(); startQuick(); showA2HS();
   if(isMainAdmin(me.role)) startScheduler();
 }
 
@@ -659,26 +633,13 @@ document.getElementById('leaveBtn').onclick=()=>{
 };
 function B(p){ return "tours/"+me.tour+"/"+p; }
 
-document.getElementById('tabChat').onclick=()=>switchTab('chat');
-document.getElementById('tabLib').onclick=()=>switchTab('lib');
-function switchTab(t){
-  const chat=t==='chat';
-  document.getElementById('tabChat').classList.toggle('on',chat);
-  document.getElementById('tabLib').classList.toggle('on',!chat);
-  document.getElementById('msgs').style.display=chat?'flex':'none';
-  document.getElementById('composer').style.display=chat?'flex':'none';
-  const qb=document.getElementById('quickBar');
-  if(chat && isAdmin(me.role) && quickItems.length) qb.classList.add('show'); else qb.classList.remove('show');
-  document.getElementById('library').classList.toggle('show',!chat);
-}
-
 const msgsEl=document.getElementById('msgs');
 function startMessages(){
   const q=query(ref(db,B("messages")), limitToLast(80));
   onChildAdded(q, snap=>{
     const m=snap.val();
     // 입장 전 메시지 차단 (관리자·본인 메시지는 예외)
-    if(me.role!=='admin' && m.uid!==me.id && m.ts && m.ts < me.joinedAt) return;
+    if(!isAdmin(me.role) && m.uid!==me.id && m.ts && m.ts < me.joinedAt) return;
     if(m.type==='sys'){ sysLine(m.text,snap.key); return; }
     renderMsg(m,snap.key);
 
@@ -873,28 +834,6 @@ if(schedAddBtn) schedAddBtn.onclick=()=>{
   alert("예약이 추가되었습니다");
 };
 
-function startLibrary(){
-  onChildAdded(ref(db,B("docs")), snap=>renderDoc(snap.val(),snap.key));
-  onChildRemoved(ref(db,B("docs")), snap=>{ const el=document.getElementById('doc_'+snap.key); if(el) el.remove(); checkLibEmpty(); });
-}
-function renderDoc(d,key){
-  document.getElementById('libEmpty').style.display='none';
-  const a=document.createElement('a'); a.className="doc-card"; a.id="doc_"+key; a.href=d.url; a.target="_blank"; a.rel="noopener";
-  const ic=document.createElement('div'); ic.className="doc-ic"; ic.textContent="PDF";
-  const wrap=document.createElement('div'); const tt=document.createElement('div'); tt.className="doc-tt"; tt.textContent=d.title; const sb=document.createElement('div'); sb.className="doc-sb"; sb.textContent="탭하여 열기 · Tap to open"; wrap.appendChild(tt); wrap.appendChild(sb);
-  a.appendChild(ic); a.appendChild(wrap);
-  if(isMainAdmin(me.role)){ const del=document.createElement('button'); del.className="doc-del"; del.textContent="삭제"; del.onclick=(e)=>{ e.preventDefault(); if(confirm("이 자료를 삭제할까요?")) remove(ref(db,B("docs/"+key))); }; a.appendChild(del); }
-  document.getElementById('library').appendChild(a);
-}
-function checkLibEmpty(){ const has=document.querySelectorAll('#library .doc-card').length>0; document.getElementById('libEmpty').style.display=has?'none':'block'; }
-document.getElementById('docAdd').onclick=()=>{
-  const t=document.getElementById('docTitle').value.trim(); const u=document.getElementById('docUrl').value.trim();
-  if(!t||!u){ alert("제목과 주소를 모두 입력하세요"); return; }
-  push(ref(db,B("docs")),{title:t,url:u,ts:Date.now()});
-  document.getElementById('docTitle').value=''; document.getElementById('docUrl').value='';
-  alert("자료가 추가되었습니다"); switchTab('lib');
-};
-
 document.getElementById('adminFab').onclick=()=>document.getElementById('adminSheet').classList.add('show');
 function closeAdmin(){ document.getElementById('adminSheet').classList.remove('show'); }
 document.getElementById('adminClose').onclick=closeAdmin;
@@ -914,7 +853,7 @@ function startQuick(){
 }
 function renderQuickBar(){
   const bar=document.getElementById('quickBar'); bar.innerHTML='';
-  if(me.role!=='admin' || quickItems.length===0){ bar.classList.remove('show'); return; }
+  if(!isAdmin(me.role) || quickItems.length===0){ bar.classList.remove('show'); return; }
   quickItems.forEach(q=>{
     const c=document.createElement('button'); c.className="quick-chip"; c.textContent=q.text;
     c.onclick=()=>{ sendMsg({type:'msg',text:q.text}); };
