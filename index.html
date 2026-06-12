@@ -94,8 +94,8 @@
   header .h-title{font-size:14px; font-weight:700; line-height:1.2}
   header .h-sub{font-size:11px; color:#8a8170; margin-top:2px}
   header .h-meta{margin-left:auto; text-align:right}
-  #leaveBtn{width:28px; height:28px; border-radius:50%; background:var(--paper-2); color:#8a8170; font-size:14px; display:flex; align-items:center; justify-content:center; flex:0 0 auto}
-  #leaveBtn:active{background:var(--line)}
+  #leaveBtn{height:28px; padding:0 11px; border-radius:15px; background:#fbeeea; color:var(--danger); border:1.5px solid var(--danger); font-size:12px; font-weight:700; display:flex; align-items:center; gap:3px; justify-content:center; flex:0 0 auto; white-space:nowrap}
+  #leaveBtn:active{background:#f5ddd5}
   .pill{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:4px 9px; border-radius:20px; background:var(--paper-2); color:var(--ink)}
   .dot{width:7px; height:7px; border-radius:50%; background:#bbb}
   .dot.live{background:var(--ok); box-shadow:0 0 0 3px rgba(60,110,71,.18)}
@@ -262,7 +262,7 @@
   <div class="h-meta">
     <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end">
       <span class="pill"><span class="dot" id="liveDot"></span><span id="onlineN">0</span></span>
-      <button id="leaveBtn" title="나가기" aria-label="나가기">⏻</button>
+      <button id="leaveBtn" title="로그아웃" aria-label="로그아웃">⏻ Log out</button>
     </div>
     <div class="admin-badge" id="adminTag" style="display:none">ADMIN</div>
   </div>
@@ -646,7 +646,13 @@ async function doEnter(){
 function doBanned(){ try{ remove(ref(db,"tours/"+me.tour+"/presence/"+me.id)); }catch(e){} clearSession(); document.getElementById('banned').classList.add('show'); }
 
 document.getElementById('leaveBtn').onclick=()=>{
-  if(!confirm("채팅에서 나가시겠어요?\n다시 들어오려면 이름과 투어를 입력해야 합니다.")) return;
+  const msg = {
+    "ko": "로그아웃 하시겠어요?\n\n투어가 끝난 뒤 자유롭게 로그아웃 하시면 됩니다.\n다시 들어오려면 이름과 투어를 선택해야 합니다.",
+    "en": "Log out?\n\nFeel free to log out after the tour ends.\nYou'll need to enter your name and tour again to rejoin.",
+    "zh-TW": "要登出嗎？\n\n行程結束後可自由登出。\n重新加入需再次輸入姓名與行程。",
+    "ja": "ログアウトしますか？\n\nツアー終了後はご自由にログアウトできます。\n再度参加するには、お名前とツアーの選択が必要です。"
+  };
+  if(!confirm(msg[me.lang] || msg["en"])) return;
   try{ remove(ref(db,"tours/"+me.tour+"/presence/"+me.id)); }catch(e){}
   clearSession();
   location.reload();
